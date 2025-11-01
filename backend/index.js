@@ -1,12 +1,18 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import uploadRoute from "./routes/upload.js";
+import parseRoute from "./routes/parse.js";
 
 dotenv.config();
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// register routes
+app.use("/api/upload", uploadRoute);
+app.use("/api/parse", parseRoute);
 
 // test route
 app.get("/api/ping", (req, res) => {
