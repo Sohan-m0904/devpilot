@@ -1,20 +1,52 @@
-// backend/routes/parse.js
 import express from "express";
-import { parseProject } from "../utils/parseCode.js";
+import path from "path";
+import { promises as fs } from "fs";
+import { supabase } from "../supabaseClient.js";
+import { walkFiles } from "../utils/fsWalk.js";
+import { inferLanguage } from "../utils/language.js";
+import { extractUnits } from "../utils/ast.js";
+import { chunkSnippet } from "../utils/chunk.js";
 
 const router = express.Router();
 
-// POST /api/parse
 router.post("/", async (req, res) => {
   try {
-    const { projectPath } = req.body; // from frontend or upload route
-    if (!projectPath) return res.status(400).json({ error: "Missing project path" });
+    const { projectId, projectPath } = req.body;
+    if (!projectId || !projectPath)
+      return res.status(400).json({ error: "projectId and projectPath required" });
 
-    const parsed = await parseProject(projectPath);
-    res.json({ message: "Parsed successfully ✅", results: parsed });
-  } catch (error) {
-    console.error("Parsing error:", error);
-    res.status(500).json({ error: "Failed to parse project" });
+    const files = await walkFiles(projectPath);
+    const inserted = [];
+
+    for (const file of files) {
+      const language = inferLanguage(file);
+      const source = await fs.readFile(file, "utf8");
+      const units = extractUnits(source);
+      for (const unit of units) {
+        for (const chunk of chunkSnippet(unit)) {
+          const { data, error } = await supabase
+            .from("snippets")
+            .insert({
+              project_id: projectId,
+              file_path: path.relative(projectPath, file),
+              language,
+              type: chunk.type,
+              name: chunk.name,
+              start_line: chunk.start,
+              end_line: chunk.end,
+              snippet: chunk.snippet,
+            })
+            .select("id,file_path,name,type");
+          if (error) throw error;
+          inserted.push(data[0]);
+        }
+      }
+    }
+
+    res.json({ ok: true, count: inserted.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
