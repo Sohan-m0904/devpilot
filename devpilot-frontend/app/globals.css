@@ -2,6 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===== Base Theme ===== */
+html,
 body {
-  @apply bg-zinc-950 text-zinc-100 min-h-screen;
+  @apply bg-[#0D1117] text-zinc-100 antialiased;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== Smooth Scroll + Transitions ===== */
+html {
+  scroll-behavior: smooth;
+}
+
+* {
+  @apply transition-colors duration-200;
+}
+
+/* ===== Scrollbar Styling ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 100, 100, 0.4);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 120, 120, 0.7);
+}
+
+/* ===== Selection Highlight ===== */
+::selection {
+  background: #3b82f6;
+  color: white;
+}
+
+/* ===== Code Font + Blocks ===== */
+code,
+pre {
+  font-family: var(--font-jetbrains), monospace;
+  background: #1e1e1e;
+  color: #e5e7eb;
+  border-radius: 0.5rem;
+}
+
+pre {
+  padding: 1rem;
+  overflow-x: auto;
+  @apply shadow-inner;
+}
+
+/* ===== Links & Buttons ===== */
+a {
+  @apply text-blue-400 hover:text-blue-300;
+  text-decoration: none;
+}
+
+button {
+  @apply rounded-lg px-3 py-2 font-medium transition-all duration-200;
+}
+
+button:hover {
+  @apply bg-zinc-800;
+}
+
+/* ===== Panel Shadows ===== */
+.glass-panel {
+  background-color: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Utility Animations ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
 }

@@ -13,13 +13,28 @@ export async function postJSON<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function uploadZip(file: File): Promise<any> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch(`${BASE}/api/upload`, { method: "POST", body: fd });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+// frontend/lib/api.ts
+export async function uploadZip(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  console.log("📤 Sending upload request to:", process.env.NEXT_PUBLIC_API_URL);
+  console.log("📤 Uploading to:", process.env.NEXT_PUBLIC_API_URL);
+
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const msg = await res.text();
+    throw new Error(`Upload failed: ${msg}`);
+  }
+
+  return await res.json();
 }
+
+
 
 export async function parseProject(projectId: string, projectPath?: string) {
   // call your /api/parse if you wish to expose this in UI

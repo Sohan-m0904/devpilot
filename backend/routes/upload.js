@@ -3,113 +3,81 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
-import { fileURLToPath } from "url";
-import { supabase } from "../supabaseClient.js"; // Supabase re-enabled
+import { supabase } from "../supabaseClient.js";
+import { embedProject } from "./embed.js";
 
 const router = express.Router();
 
-// Handle __dirname in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Configure Multer for uploads
+const upload = multer({ dest: "uploads/" });
 
-// Ensure uploads folder exists
-const uploadFolder = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadFolder)) fs.mkdirSync(uploadFolder, { recursive: true });
-
-// Configure Multer (safe on Windows)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadFolder),
-  filename: (req, file, cb) => {
-    const safeName = Date.now() + "-" + file.originalname.replace(/\s+/g, "_");
-    cb(null, safeName);
-  },
-});
-const upload = multer({ storage });
-
-// Helper function to safely insert into Supabase with timeout
-async function safeSupabaseInsert(payload) {
-  try {
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Supabase request timed out")), 4000)
-    );
-
-    const insert = supabase.from("projects").insert([payload]).select();
-    return await Promise.race([insert, timeout]);
-  } catch (err) {
-    throw err;
-  }
-}
-
+/**
+ * POST /api/upload
+ * Handles ZIP upload, extraction, DB insert, and triggers embedding automatically
+ */
 router.post("/", upload.single("file"), async (req, res) => {
-  console.log("📦 /api/upload hit");
-
   try {
     if (!req.file) {
-      console.warn("❌ No file uploaded");
       return res.status(400).json({ error: "No file uploaded" });
     }
 
+    // ✅ Extract user_id if provided in multipart form
+    const userId = req.body?.user_id || null;
+    if (userId) console.log(`👤 Upload initiated by user: ${userId}`);
+    else console.log("👥 Guest upload (no user_id)");
+
     const zipPath = req.file.path;
-    const folderName = path.parse(req.file.originalname).name.replace(/\s+/g, "_");
-    const extractPath = path.join(uploadFolder, folderName);
-    console.log("🗂 Extract path:", extractPath);
+    const projectName = path.basename(req.file.originalname, ".zip");
+    const extractDir = path.join("uploads", `${projectName}_${Date.now()}`);
 
-    if (!fs.existsSync(extractPath)) fs.mkdirSync(extractPath, { recursive: true });
+    // Ensure uploads folder exists
+    fs.mkdirSync(extractDir, { recursive: true });
 
-    // Extract the ZIP
-    try {
-      const zip = new AdmZip(zipPath);
-      zip.extractAllTo(extractPath, true);
-      console.log("✅ ZIP extracted successfully");
-    } catch (err) {
-      console.error("❌ ZIP extraction failed:", err);
-      return res.status(500).json({ error: "ZIP extraction failed" });
+    // ✅ Extract ZIP contents
+    const zip = new AdmZip(zipPath);
+    zip.extractAllTo(extractDir, true);
+    fs.unlinkSync(zipPath); // cleanup ZIP
+
+    console.log(`📦 Extracted project: ${projectName}`);
+    console.log(`🗂️ Extract path: ${extractDir}`);
+
+    // ✅ Insert project into Supabase with optional user_id
+    const { data: project, error: insertError } = await supabase
+      .from("projects")
+      .insert([
+        {
+          name: projectName,
+          extract_path: extractDir,
+          user_id: userId, // 👈 attach user_id if logged in
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("❌ Supabase insert error:", insertError.message);
+      throw insertError;
     }
 
-    // Delete the uploaded ZIP file
-    fs.unlink(zipPath, () => {});
+    const projectId = project.id;
+    console.log(`✅ Uploaded & inserted project: ${projectName} (ID: ${projectId})`);
 
-    // ✅ Respond to client first
-    res.status(200).json({
-      message: "File uploaded and extracted ✅",
-      folder: `uploads/${folderName}`,
-    });
+    // ✅ Automatically embed after upload
+    await embedProject(projectId, extractDir);
 
-    // ⏳ Then run Supabase insert safely
-    setImmediate(async () => {
-      console.log("🧠 Background task started...");
-      try {
-        const { data, error } = await supabase
-          .from("projects")
-          .insert([
-            {
-              name: folderName,
-              extract_path: `uploads/${folderName}`,
-              user_id: null,
-            },
-          ])
-          .select();
+    console.log(`✅ Embedding completed for project ${projectId}`);
 
-        if (error) {
-          console.error("❌ (BG) Supabase insert error:", error.message);
-        } else {
-          console.log("✅ (BG) Project saved to Supabase:", data[0]);
-        }
-      } catch (err) {
-        console.error("🔥 (BG) Supabase insert crashed:", err);
-      }
-      console.log("🧠 Background task ended.");
+    return res.json({
+      success: true,
+      projectId,
+      projectName,
+      message: "Project uploaded, extracted, and embedded successfully.",
     });
-  } catch (error) {
-    console.error("❌ Upload route crashed:", error);
-    return res.status(500).json({
-      error: "Unexpected server error during upload",
-      details: error.message,
-    });
+  } catch (err) {
+    console.error("❌ Upload failed:", err);
+    return res.status(500).json({ error: err.message || "Upload failed" });
   }
 });
-
-
-
 
 export default router;

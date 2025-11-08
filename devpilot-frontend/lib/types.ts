@@ -1,8 +1,17 @@
-export type QueryTopItem = {
-  snippet_id: string;
-  snippet: string;
+// frontend/lib/types.ts
+
+export interface QueryTopItem {
+  id?: string;
+  snippet?: string;     // optional alias for content
+  content?: string;     // the actual code text
+  file_path?: string;   // file path in Supabase
   score: number;
-};
+}
+
+export interface QueryResult {
+  top: QueryTopItem[];
+}
+
 
 export type QueryResponse = {
   ok: boolean;
@@ -20,3 +29,7 @@ export type UploadResult = {
   folder: string;
   projectId?: string; // if your backend returns it later
 };
+export interface QueryResult {
+  top: QueryTopItem[];
+}
+
