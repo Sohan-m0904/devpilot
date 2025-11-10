@@ -1,27 +1,33 @@
-const BASE = process.env.NEXT_PUBLIC_BACKEND_URL as string;
+// frontend/lib/api.ts
 
+// 🧠 Use a single consistent backend base URL
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE || "https://devpilot.onrender.com";
+
+// 🧩 Generic POST JSON helper
 export async function postJSON<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `Request failed: ${res.status}`);
   }
+
   return res.json() as Promise<T>;
 }
 
-// frontend/lib/api.ts
+// 📦 Upload ZIP
 export async function uploadZip(file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  console.log("📤 Sending upload request to:", process.env.NEXT_PUBLIC_API_URL);
-  console.log("📤 Uploading to:", process.env.NEXT_PUBLIC_API_URL);
+  console.log("📤 Uploading to:", `${BASE_URL}/api/upload`);
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
+  const res = await fetch(`${BASE_URL}/api/upload`, {
     method: "POST",
     body: formData,
   });
@@ -34,17 +40,17 @@ export async function uploadZip(file: File) {
   return await res.json();
 }
 
-
-
+// 🧠 Parse project
 export async function parseProject(projectId: string, projectPath?: string) {
-  // call your /api/parse if you wish to expose this in UI
   return postJSON(`/api/parse`, { projectId, projectPath });
 }
 
+// 🧠 Embed project (if you use embedding separately)
 export async function runEmbed(projectId: string) {
   return postJSON(`/api/embed`, { projectId });
 }
 
+// 💬 Query project
 export async function runQuery(projectId: string, question: string, k = 5) {
   return postJSON(`/api/query`, { projectId, question, k });
 }
